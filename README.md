@@ -1,4 +1,4 @@
-![boxd: composable computers for Dify workflows and agents](assets/banner.png)
+![boxd: composable computers for Dify workflows and agents](https://raw.githubusercontent.com/boxd-sh/boxd-dify/main/assets/banner.png)
 
 # boxd for Dify
 
