@@ -5,7 +5,7 @@ from boxd.errors import BoxdError
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import MAX_FILE_BYTES, abs_path, build_client, friendly_error, get_machine, require
+from _client import MAX_FILE_BYTES, abs_path, build_client, ensure_running, friendly_error, require
 
 
 class WriteFileTool(Tool):
@@ -19,7 +19,7 @@ class WriteFileTool(Tool):
         data = str(content).encode("utf-8")
         if len(data) > MAX_FILE_BYTES:
             raise ValueError(f"content is larger than {MAX_FILE_BYTES // 2**20} MiB")
-        get_machine(client, machine_id)
+        ensure_running(client, machine_id)
         try:
             client.machines.files.upload(machine_id, remote, data)
         except BoxdError as e:

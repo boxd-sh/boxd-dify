@@ -219,6 +219,30 @@ def main() -> int:
 
         check("run_command: timeout kills the remote process", timeout)
 
+        def killed_is_not_timed_out():
+            r = call(runner, "run_command", {"command": "kill -9 $$", "timeout": 30, "machine_id": mid})
+            expect(r["j"]["exit_code"] == 137 and r["j"]["timed_out"] is False, json.dumps(r["j"]))
+            return "exit 137 before the limit, timed_out false"
+
+        check("run_command: a killed command is not reported as timed out", killed_is_not_timed_out)
+
+        def big_output():
+            command = (
+                "head -c 300M /dev/zero | tr '\\0' x; head -c 50M /dev/zero | tr '\\0' e >&2; "
+                "echo done > /tmp/big; exit 7"
+            )
+            t0 = time.monotonic()
+            r = call(runner, "run_command", {"command": command, "machine_id": mid})
+            took = time.monotonic() - t0
+            j = r["j"]
+            expect(j["exit_code"] == 7 and j["truncated"] is True, f"exit {j['exit_code']} truncated {j['truncated']}")
+            expect(j["stdout"] == "x" * 100_000 and j["stderr"] == "e" * 100_000, "output is not the first 100,000")
+            ran = call(runner, "run_command", {"command": "cat /tmp/big", "machine_id": mid})
+            expect(ran["j"]["stdout"] == "done\n" and ran["j"]["truncated"] is False, ran["j"])
+            return f"350 MiB printed, 100,000 characters per stream returned in {took:.1f}s, exit code 7 kept"
+
+        check("run_command: large output is cut inside the machine", big_output)
+
         for lang, code, want in [
             ("python", "import sys; print(sys.version_info[:2])", "(3, 12)"),
             ("javascript", "console.log([1,2,3].map(x => x * 2).join(','))", "2,4,6"),
@@ -275,6 +299,23 @@ def main() -> int:
             return f"5 MiB round trip, sha256 {digest[:16]}... matches on the machine and after download"
 
         check("upload_file / download_file 5 MiB sha256", upload_download)
+
+        def too_large():
+            call(runner, "run_command", {"command": "truncate -s 51M /home/boxd/large.bin", "machine_id": mid})
+            seen = []
+            for tool in ("download_file", "read_file"):
+                t0 = time.monotonic()
+                try:
+                    call(runner, tool, {"machine_id": mid, "remote_path": "/home/boxd/large.bin"})
+                except ValueError as e:
+                    expect("larger than 50 MiB" in short_error(e), short_error(e))
+                    seen.append(f"{tool} refused in {time.monotonic() - t0:.1f}s")
+                    continue
+                raise AssertionError(f"{tool} returned a 51 MiB file")
+            call(runner, "run_command", {"command": "rm /home/boxd/large.bin", "machine_id": mid})
+            return "; ".join(seen)
+
+        check("download_file / read_file refuse a 51 MiB file before reading it", too_large)
 
         svc = {}
 
@@ -395,6 +436,44 @@ def main() -> int:
             return f"hibernated, woke in {woke:.1f}s ({w['j']['status']}); server from before hibernate still answers"
 
         check("manage_machine hibernate / wake keeps processes", hibernate_wake)
+
+        def asleep(action: str, status: str) -> None:
+            r = call(runner, "manage_machine", {"machine_id": mid, "action": action})
+            expect(r["j"]["status"] == status and sdk.machines.get(mid).status == status, r["j"])
+
+        def sleeping_machine_tools(action: str, status: str):
+            def run():
+                path = f"/home/boxd/{status}.txt"
+                asleep(action, status)
+                w = call(runner, "write_file", {"machine_id": mid, "remote_path": path, "content": status})
+                expect(w["j"]["success"] and sdk.machines.get(mid).status == "running", w["j"])
+                asleep(action, status)
+                r = call(runner, "read_file", {"machine_id": mid, "remote_path": path})
+                expect(r["j"]["content"] == status, r["j"])
+                asleep(action, status)
+                ls = call(runner, "list_files", {"machine_id": mid, "path": "/home/boxd"})
+                expect(f"{status}.txt" in [e["name"] for e in ls["j"]["entries"]], ls["j"])
+                asleep(action, status)
+                d = call(runner, "download_file", {"machine_id": mid, "remote_path": path})
+                expect(b"".join(d["blob"]) == status.encode(), d["j"])
+                asleep(action, status)
+                p = call(runner, "get_preview_url", {"machine_id": mid, "port": 8000})
+                expect(p["j"]["url"].startswith("https://") and sdk.machines.get(mid).status == "running", p["j"])
+                asleep(action, status)
+                f = call(runner, "fork_machine", {"machine_id": mid, "delete_after": 600})
+                fid = f["j"]["machine_id"]
+                CREATED.append(fid)
+                seen = call(runner, "read_file", {"machine_id": fid, "remote_path": path})
+                expect(seen["j"]["content"] == status, seen["j"])
+                call(runner, "delete_machine", {"machine_id": fid})
+                return f"write, read, list, download, preview URL and fork each worked on a {status} machine"
+
+            return run
+
+        check(
+            "file, preview and fork tools wake a hibernated machine", sleeping_machine_tools("hibernate", "hibernated")
+        )
+        check("file, preview and fork tools start a stopped machine", sleeping_machine_tools("stop", "stopped"))
 
         def ephemeral():
             r = call(runner, "run_command", {"command": "hostname; echo ok"})

@@ -1,10 +1,13 @@
+import sys
+import time
+
 import pytest
-from boxd.errors import AuthenticationError
+from boxd.errors import AuthenticationError, BoxdError
 from boxd.models import ExecResult
 from dify_plugin.errors.tool import ToolProviderCredentialValidationError
 
 import _client
-from conftest import CREDS, invoke, make_machine
+from conftest import CREDS, invoke, make_machine, unwrap
 from provider.boxd import BoxdProvider
 from tools.create_machine import CreateMachineTool
 from tools.delete_machine import DeleteMachineTool
@@ -19,11 +22,16 @@ from tools.read_file import ReadFileTool
 from tools.run_code import RunCodeTool
 from tools.run_command import RunCommandTool
 from tools.start_service import StartServiceTool
+from tools.upload_file import UploadFileTool
 from tools.write_file import WriteFileTool
 
 
 def created(fake):
     return [c for c in fake.calls if c[0][0] == "create"]
+
+
+def execs(fake):
+    return [c for c in fake.calls if c[0][0] == "exec"]
 
 
 def test_create_machine_is_always_isolated_and_labelled(fake):
@@ -90,12 +98,14 @@ def test_run_command_on_existing_machine_keeps_it(fake):
 
 def test_run_command_wraps_in_timeout_so_the_process_is_killed(fake):
     fake.machines["m1"] = make_machine("m1", "keep")
-    fake.exec_results = [ExecResult(stdout="", stderr="", exit_code=124)]
+    fake.exec_results = [lambda tag: ExecResult(stdout="", stderr=f"\n[{tag}:timed-out]", exit_code=124)]
     r = invoke(RunCommandTool, {"command": "sleep 99", "machine_id": "m1", "timeout": 5})
-    ((args, kwargs),) = [c for c in fake.calls if c[0][0] == "exec"]
-    assert args[2] == "timeout -k 5 5 bash -c 'sleep 99'"
+    ((args, kwargs),) = execs(fake)
+    sent = unwrap(args[2])
+    assert (sent.seconds, sent.command) == (5, "sleep 99")
+    assert 'timeout -k 5 "$1" bash -c "$4"' in _client._RUN_SCRIPT
     assert kwargs["timeout"] == 35
-    assert r.json["timed_out"] is True
+    assert r.json["timed_out"] is True and r.json["stderr"] == ""
 
 
 def test_run_command_rejects_timeout_out_of_range(fake):
@@ -375,3 +385,314 @@ def test_tool_yaml_output_schema_matches_the_variables(fake):
     assert declared["run_command"] == declared["run_code"] == {"stdout", "stderr", "exit_code"}
     assert declared["get_preview_url"] == {"url"}
     assert declared["start_service"] == {"service_id"}
+
+
+# A command must never run twice
+
+
+def test_conflict_on_a_running_machine_is_not_retried(fake):
+    fake.machines["m1"] = make_machine("m1", "busy")
+    fake.conflict_once = True
+    with pytest.raises(ValueError, match="boxd request failed"):
+        invoke(RunCommandTool, {"command": "charge-the-card", "machine_id": "m1"})
+    names = fake.names()
+    assert names.count("exec") == 1
+    assert not {"start", "wake", "resume", "wait_until_ready"} & set(names)
+
+
+@pytest.mark.parametrize("code", ["aborted", "already_exists"])
+def test_conflict_that_is_not_about_a_sleeping_machine_is_not_retried(fake, code):
+    # the machine went to sleep after the command was accepted: it may have run
+    fake.machines["m1"] = make_machine("m1", "s", status="stopped")
+    fake.conflict_once = True
+    fake.conflict_code = code
+    with pytest.raises(ValueError, match="boxd request failed"):
+        invoke(RunCommandTool, {"command": "charge-the-card", "machine_id": "m1"})
+    assert fake.names().count("exec") == 1 and "start" not in fake.names()
+
+
+def test_conflict_on_a_machine_that_is_starting_is_not_retried(fake):
+    fake.machines["m1"] = make_machine("m1", "s", status="starting")
+    fake.conflict_once = True
+    with pytest.raises(ValueError, match="boxd request failed"):
+        invoke(RunCommandTool, {"command": "charge-the-card", "machine_id": "m1"})
+    assert fake.names().count("exec") == 1
+
+
+def test_exec_on_paused_machine_resumes_it_and_runs_once_more(fake):
+    fake.machines["m1"] = make_machine("m1", "p", status="suspended")
+    fake.conflict_once = True
+    invoke(RunCommandTool, {"command": "echo hi", "machine_id": "m1"})
+    names = fake.names()
+    assert names.count("exec") == 2 and names.count("resume") == 1
+
+
+def test_second_failure_after_a_wake_is_reported(fake):
+    fake.machines["m1"] = make_machine("m1", "s", status="stopped")
+    real_exec = fake.exec
+
+    def always_conflict(mid, command, **kwargs):
+        fake.conflict_once = True
+        return real_exec(mid, command, **kwargs)
+
+    fake.exec = always_conflict
+    with pytest.raises(ValueError, match="boxd request failed"):
+        invoke(RunCommandTool, {"command": "echo hi", "machine_id": "m1"})
+    assert fake.names().count("exec") == 2
+
+
+# A machine that does not become ready is not left behind
+
+
+def test_create_machine_deletes_the_machine_when_it_never_becomes_ready(fake):
+    fake.ready_error = TimeoutError("machine id-1 did not reach 'running' within 120s")
+    with pytest.raises(ValueError, match=r"\(id-1\) did not become ready.*It was deleted"):
+        invoke(CreateMachineTool, {"name": "slow"})
+    assert ("delete", "id-1") in [c[0] for c in fake.calls]
+    assert fake.machines == {}
+
+
+def test_create_machine_error_names_the_machine_when_the_delete_fails_too(fake):
+    fake.ready_error = BoxdError("machine id-1 entered terminal state 'failed' while waiting")
+    fake.delete_error = BoxdError("unavailable")
+    with pytest.raises(ValueError) as e:
+        invoke(CreateMachineTool, {"name": "slow"})
+    assert "slow (id-1)" in str(e.value) and "still exists" in str(e.value)
+
+
+def test_one_off_machine_is_marked_created_before_the_ready_wait_and_deleted(fake):
+    fake.ready_error = TimeoutError("not ready")
+    client, settings = _client.build_client(CREDS)
+    eph = _client.Ephemeral(client, settings, None)
+    seen = {}
+    real_wait = fake.wait_until_ready
+
+    def wait(mid, timeout=None):
+        seen.update(created=eph.created, machine_id=eph.machine_id)
+        return real_wait(mid, timeout=timeout)
+
+    fake.wait_until_ready = wait
+    with pytest.raises(ValueError, match="did not become ready"):
+        with eph:
+            raise AssertionError("the body must not run")
+    assert seen == {"created": True, "machine_id": "id-1"}
+    assert eph.created is True and eph.machine_id == "id-1"
+    assert fake.machines == {} and fake.names().count("delete") == 1
+
+
+def test_run_command_leaves_no_machine_when_the_one_off_machine_never_becomes_ready(fake):
+    fake.ready_error = TimeoutError("not ready")
+    with pytest.raises(ValueError, match="did not become ready"):
+        invoke(RunCommandTool, {"command": "true"})
+    assert fake.machines == {} and "exec" not in fake.names()
+
+
+def test_fork_deletes_the_copy_when_it_never_becomes_ready_and_keeps_the_source(fake):
+    fake.machines["m1"] = make_machine("m1", "src")
+    fake.ready_error = TimeoutError("not ready")
+    with pytest.raises(ValueError, match=r"\(id-1\) did not become ready"):
+        invoke(ForkMachineTool, {"machine_id": "m1", "name": "copy"})
+    assert list(fake.machines) == ["m1"]
+    assert [c[0] for c in fake.calls if c[0][0] == "delete"] == [("delete", "id-1")]
+
+
+# Output is cut inside the machine
+
+
+def test_run_sends_the_byte_limit_and_a_fresh_tag(fake):
+    fake.machines["m1"] = make_machine("m1", "k")
+    invoke(RunCommandTool, {"command": "yes", "machine_id": "m1"})
+    invoke(RunCommandTool, {"command": "yes", "machine_id": "m1"})
+    a, b = (unwrap(c[0][2]) for c in execs(fake))
+    assert a.limit == _client.MAX_OUTPUT_BYTES == 400_000
+    assert a.tag != b.tag and a.tag.startswith("boxd-dify-")
+
+
+def test_truncation_marker_from_the_machine_sets_truncated_and_is_removed(fake):
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.exec_results = [
+        lambda tag: ExecResult(stdout=f"abc\n[{tag}:truncated]", stderr=f"warn\n[{tag}:truncated]", exit_code=2)
+    ]
+    r = invoke(RunCommandTool, {"command": "x", "machine_id": "m1"})
+    assert (r.json["stdout"], r.json["stderr"]) == ("abc", "warn")
+    assert r.json["truncated"] is True and r.json["exit_code"] == 2
+
+
+def test_marker_text_printed_by_the_command_itself_is_left_alone(fake):
+    fake.machines["m1"] = make_machine("m1", "k")
+    forged = "\n[boxd-dify-0000000000000000:truncated]"
+    fake.exec_results = [
+        ExecResult(stdout="abc" + forged, stderr=forged.replace("truncated", "timed-out"), exit_code=0)
+    ]
+    r = invoke(RunCommandTool, {"command": "x", "machine_id": "m1"})
+    assert r.json["stdout"].endswith(forged)
+    assert r.json["truncated"] is False and r.json["timed_out"] is False
+
+
+linux_only = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="runs the wrapper in a local GNU shell")
+
+
+@linux_only
+def test_output_is_cut_before_it_reaches_the_plugin_and_the_exit_code_is_kept(fake, monkeypatch):
+    monkeypatch.setattr(_client, "MAX_OUTPUT_BYTES", 2000)
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.real_shell = True
+    command = "head -c 3000000 /dev/zero | tr '\\0' x; head -c 5000 /dev/zero | tr '\\0' e >&2; exit 7"
+    r = invoke(RunCommandTool, {"command": command, "machine_id": "m1"})
+    (raw,) = fake.raw_results
+    # what crossed the wire is the limit plus the short marker, not three megabytes
+    assert len(raw.stdout) < 2100 and len(raw.stderr) < 2100
+    assert r.json["stdout"] == "x" * 2000 and r.json["stderr"] == "e" * 2000
+    assert r.json["truncated"] is True and r.json["exit_code"] == 7 and r.json["timed_out"] is False
+
+
+@linux_only
+def test_output_at_the_limit_is_whole_and_not_marked(fake, monkeypatch):
+    monkeypatch.setattr(_client, "MAX_OUTPUT_BYTES", 2000)
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.real_shell = True
+    r = invoke(
+        RunCommandTool, {"command": "head -c 2000 /dev/zero | tr '\\0' x; echo oops >&2; exit 3", "machine_id": "m1"}
+    )
+    assert r.json["stdout"] == "x" * 2000 and r.json["stderr"] == "oops\n"
+    assert r.json["truncated"] is False and r.json["exit_code"] == 3
+
+
+@linux_only
+def test_wrapper_keeps_quoting_and_does_not_wait_for_background_children(fake):
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.real_shell = True
+    started = time.monotonic()
+    r = invoke(RunCommandTool, {"command": """sleep 6 & echo "it's" 'a "test"' $((6 * 7))""", "machine_id": "m1"})
+    assert time.monotonic() - started < 4
+    assert r.json["stdout"] == 'it\'s a "test" 42\n' and r.json["exit_code"] == 0
+
+
+# timed_out comes from the machine's marker, not from the exit code
+
+
+@pytest.mark.parametrize("code", [124, 137])
+def test_exit_code_alone_does_not_mean_timed_out(fake, code):
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.exec_results = [ExecResult(stdout="", stderr="", exit_code=code)]
+    r = invoke(RunCommandTool, {"command": "eat-all-memory", "machine_id": "m1"})
+    assert r.json["exit_code"] == code and r.json["timed_out"] is False
+
+
+@linux_only
+def test_timeout_is_marked_and_a_kill_before_the_limit_is_not(fake):
+    fake.machines["m1"] = make_machine("m1", "k")
+    fake.real_shell = True
+    slow = invoke(RunCommandTool, {"command": "echo started; sleep 30", "machine_id": "m1", "timeout": 1})
+    assert slow.json["timed_out"] is True and slow.json["exit_code"] == 124 and slow.json["stdout"] == "started\n"
+    killed = invoke(RunCommandTool, {"command": "kill -9 $$", "machine_id": "m1", "timeout": 20})
+    assert killed.json["exit_code"] == 137 and killed.json["timed_out"] is False and killed.json["stderr"] == ""
+
+
+# Files are measured before they are transferred
+
+
+@pytest.mark.parametrize("tool", [DownloadFileTool, ReadFileTool])
+def test_large_file_is_refused_before_it_is_downloaded(fake, monkeypatch, tool):
+    monkeypatch.setattr(_client, "MAX_FILE_BYTES", 10)
+    fake.machines["m1"] = make_machine("m1", "x")
+    fake.files.store[("m1", "/data/big.bin")] = b"x" * 11
+    with pytest.raises(ValueError, match="larger than"):
+        invoke(tool, {"machine_id": "m1", "remote_path": "/data/big.bin"})
+    names = fake.names()
+    assert "stat" in names and "download" not in names
+
+
+@pytest.mark.parametrize("tool", [DownloadFileTool, ReadFileTool])
+def test_file_at_the_limit_is_measured_then_downloaded(fake, monkeypatch, tool):
+    monkeypatch.setattr(_client, "MAX_FILE_BYTES", 10)
+    fake.machines["m1"] = make_machine("m1", "x")
+    fake.files.store[("m1", "/data/ok.txt")] = b"x" * 10
+    r = invoke(tool, {"machine_id": "m1", "remote_path": "/data/ok.txt"})
+    assert r.json["size_bytes"] == 10
+    names = fake.names()
+    assert names.index("stat") < names.index("download")
+
+
+@pytest.mark.parametrize("tool", [DownloadFileTool, ReadFileTool])
+def test_missing_file_is_reported_by_the_size_check(fake, tool):
+    fake.machines["m1"] = make_machine("m1", "x")
+    with pytest.raises(ValueError, match="Not found"):
+        invoke(tool, {"machine_id": "m1", "remote_path": "/nope"})
+    assert "download" not in fake.names()
+
+
+def test_size_check_falls_back_to_stat_on_a_machine_without_the_call(fake, monkeypatch):
+    monkeypatch.setattr(_client, "MAX_FILE_BYTES", 10)
+    fake.machines["m1"] = make_machine("m1", "old")
+    fake.fs.outdated = True
+    fake.files.store[("m1", "/data/big.bin")] = b"x" * 11
+    fake.exec_results = [ExecResult(stdout="11\n", stderr="", exit_code=0)]
+    with pytest.raises(ValueError, match="larger than"):
+        invoke(DownloadFileTool, {"machine_id": "m1", "remote_path": "/data/big.bin"})
+    ((args, _),) = execs(fake)
+    assert args[2] == "stat -L -c %s -- /data/big.bin" and "download" not in fake.names()
+    fake.exec_results = [
+        ExecResult(stdout="", stderr="stat: cannot statx '/nope': No such file or directory\n", exit_code=1)
+    ]
+    with pytest.raises(ValueError, match="Not found: stat: cannot statx"):
+        invoke(DownloadFileTool, {"machine_id": "m1", "remote_path": "/nope"})
+
+
+# Every tool that needs the machine brings it back first
+
+
+class FakeUpload:
+    filename = "up.bin"
+    blob = b"abc"
+
+
+SLEEPY_TOOLS = [
+    (WriteFileTool, {"remote_path": "a.txt", "content": "x"}, "upload"),
+    (UploadFileTool, {"file": FakeUpload(), "remote_path": "/home/boxd/"}, "upload"),
+    (ReadFileTool, {"remote_path": "/home/boxd/seed.txt"}, "stat"),
+    (DownloadFileTool, {"remote_path": "/home/boxd/seed.txt"}, "stat"),
+    (ListFilesTool, {}, "list_dir"),
+    (ForkMachineTool, {"name": "copy"}, "fork"),
+    (GetPreviewUrlTool, {"port": 8000}, None),
+]
+
+
+@pytest.mark.parametrize("status,action", [("stopped", "start"), ("hibernated", "wake"), ("suspended", "resume")])
+@pytest.mark.parametrize("tool,params,first_call", SLEEPY_TOOLS, ids=lambda v: getattr(v, "__name__", None))
+def test_tool_brings_a_sleeping_machine_back_first(fake, tool, params, first_call, status, action):
+    fake.machines["m1"] = make_machine("m1", "sleepy", status=status)
+    fake.files.store[("m1", "/home/boxd/seed.txt")] = b"seed"
+    invoke(tool, {"machine_id": "m1", **params})
+    names = fake.names()
+    assert names.count(action) == 1
+    assert names.index(action) < names.index("wait_until_ready")
+    if first_call:
+        assert names.index("wait_until_ready") < names.index(first_call)
+    assert fake.machines["m1"].status == "running"
+
+
+@pytest.mark.parametrize("tool,params,first_call", SLEEPY_TOOLS, ids=lambda v: getattr(v, "__name__", None))
+def test_tool_on_a_running_machine_does_not_touch_its_state(fake, tool, params, first_call):
+    fake.machines["m1"] = make_machine("m1", "awake")
+    fake.files.store[("m1", "/home/boxd/seed.txt")] = b"seed"
+    invoke(tool, {"machine_id": "m1", **params})
+    assert not {"start", "wake", "resume"} & set(fake.names())
+
+
+def test_failed_machine_is_reported_by_the_file_tools(fake):
+    fake.machines["m1"] = make_machine("m1", "broken", status="failed")
+    with pytest.raises(ValueError, match="is failed"):
+        invoke(ListFilesTool, {"machine_id": "m1"})
+
+
+def test_machine_that_does_not_come_back_is_reported(fake):
+    fake.machines["m1"] = make_machine("m1", "s", status="stopped")
+
+    def never(mid, timeout=None):
+        raise TimeoutError("machine m1 did not reach 'running' within 120s")
+
+    fake.wait_until_ready = never
+    with pytest.raises(ValueError, match="was stopped and did not become ready"):
+        invoke(ReadFileTool, {"machine_id": "m1", "remote_path": "/x"})
+    assert "delete" not in fake.names()

@@ -19,6 +19,18 @@ Initial release.
   machine after that many seconds whatever happens to the workflow.
 - `machine_id`, `stdout`, `stderr`, `exit_code`, `service_id` and `url` are
   workflow variables, next to each tool's text and JSON output.
-- Commands on a stopped, paused or hibernated machine start or wake it first.
+- Every tool that works inside a machine starts or wakes it first when it is
+  stopped, paused or hibernated: commands, services, files, Fork Machine and
+  Get Preview URL.
+- A command runs once. It is sent again only when the machine was stopped,
+  paused or hibernated, so it had not started.
+- Command output is cut inside the machine (400,000 bytes per stream, 100,000
+  characters in the result), and the command keeps its exit code.
+- Download File and Read File check the size before they transfer a file and
+  refuse anything over 50 MiB.
+- A new machine or fork that does not become ready is deleted again, and the
+  error names it.
+- `timed_out` is true only when the time limit stopped the command, not for
+  every exit code 137.
 - Three example workflows (`examples/`): a quick start, a persistent
   workspace that hibernates between runs, and two forks working in parallel.

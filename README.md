@@ -134,8 +134,15 @@ when your workflow stops halfway.
 to 600, default 120). The command is stopped inside the machine when it runs
 out, and `timed_out` is true.
 
-**Stopped or hibernated machines.** Commands on a stopped, paused or
-hibernated machine start or wake it first.
+**Stopped or hibernated machines.** Every tool that works inside a machine
+starts or wakes it first when it is stopped, paused or hibernated: the command
+and service tools, the file tools, **Fork Machine** and **Get Preview URL**.
+**List Machines** and **Delete Machine** leave it as it is.
+
+**A command runs once.** When boxd reports a conflict for a command, the
+plugin runs it again only if the machine was stopped, paused or hibernated, so
+the command never started. Any other conflict is returned as an error, and the
+command is not repeated.
 
 ## Examples
 
@@ -163,31 +170,37 @@ agent gets the message as the tool's result and can react to it.
 |---|---|
 | The command or code exited non-zero | No error: the result has that `exit_code`, `stdout` and `stderr` |
 | The command ran past its `timeout` | No error: the process is stopped inside the machine, `timed_out` is `true` and `exit_code` is `124` (`137` if it had to be killed) |
-| The output is longer than 100,000 characters | No error: the output is cut there and `truncated` is `true` |
+| The command was killed for another reason, for example because the machine ran out of memory | No error: `exit_code` is `137` and `timed_out` is `false` |
+| The output is longer than 100,000 characters | No error: the output is cut there and `truncated` is `true`. The command still runs to its end and keeps its `exit_code` |
 | The API key is missing or wrong at **Authorize** | `A boxd API key is required` or `boxd rejected the API key. Check it in the plugin settings.` The key is never part of a message |
 | The `machine_id` does not exist | `Machine '<id>' not found` |
 | The machine is stopped, paused or hibernated | No error: it is started or woken first |
+| A stopped, paused or hibernated machine does not come back within 120 seconds | `Machine '<id>' was <status> and did not become ready: ...` |
 | The machine has failed | `Machine '<id>' is failed` |
+| A new machine or fork does not become ready within 120 seconds | `Machine <name> (<id>) did not become ready: ... It was deleted.` The plugin deletes the machine it just made, so nothing is left behind. If that delete fails too, the message says the machine still exists, with its id |
+| boxd reports a conflict for a command on a machine that is running | `boxd request failed: ...` The command is not run a second time |
 | **Delete Machine** on a machine the plugin did not create | `Machine '<name>' was not created by this plugin (no created-by=dify label), so it is not deleted.` |
 | A parameter is out of range or malformed (`timeout`, `size`, `language`, `action`, `port`, `delete_after`, a fraction where a whole number is needed, `env_vars` or `labels` that are not a JSON object) | A message that names the parameter and the allowed values |
-| A file is larger than 50 MiB | `file is larger than 50 MiB` |
+| A file is larger than 50 MiB | `file is larger than 50 MiB`. **Download File** and **Read File** check the size first and don't read the file |
 | **Read File** on a file that is not UTF-8 text | `<path> is not a UTF-8 text file. Use Download File instead.` |
 | A file or directory does not exist | `Not found: ...` |
 | **Get Service Logs** with an unknown `service_id` | `Service <id> not found on machine <id>` |
 | boxd refuses the request, for example over your organization's quota | `boxd denied the request: ...` or `boxd request failed: ...` with boxd's reason |
 
-A machine made for a one-off run is deleted when the run fails too.
+A machine made for a one-off run is deleted when the run fails too, also when
+the machine never became ready.
 
 ## Limits
 
 | | Limit |
 |---|---|
 | Command timeout | 1 to 600 seconds, default 120 (`timeout`) |
-| Output | 100,000 characters each for `stdout` and `stderr`; **Read File** returns the first 100,000 characters |
-| Files | 50 MiB per upload, download or write |
+| Output | 100,000 characters each for `stdout` and `stderr`. Each stream is cut inside the machine at 400,000 bytes, so more than that never reaches Dify. **Read File** returns the first 100,000 characters |
+| Files | 50 MiB per upload, download, read or write |
+| Background processes | a command that leaves a process in the background with its output attached returns up to a second later. Use **Start Service** for those |
 | Machine sizes | 1 vCPU / 4 GiB, 2 / 8, 4 / 16 or 8 / 32, up to your organization's quota. 100 GB disk |
 | Regions | `nyc` and `fra` |
-| Machine ready | **Create Machine**, **Fork Machine** and wake-ups wait up to 120 seconds; it usually takes about a second |
+| Machine ready | **Create Machine**, **Fork Machine** and wake-ups wait up to 120 seconds; it usually takes about a second. A new machine or fork that is not ready by then is deleted |
 | Delete after | at least 60 seconds. A machine made for a one-off run always gets one hour |
 | Service logs | the last 200 lines by default, 5,000 at most (`lines`) |
 | Preview URLs | one per port. The URL is public: anyone who has it can reach the service |
@@ -208,6 +221,18 @@ A machine made for a one-off run is deleted when the run fails too.
 - **Run Command** runs `timeout -k 5 <seconds> bash -c '<command>'` as the
   `boxd` user, who has passwordless `sudo`. Relative paths start at
   `/home/boxd`.
+- The command's `stdout` and `stderr` each pass through a small shell wrapper
+  inside the machine. It passes the first 400,000 bytes on and reads the rest
+  away, so a command that prints a lot is not blocked or stopped, and its
+  output never fills the plugin's memory. The wrapper also tells the plugin
+  whether the time limit stopped the command. It needs `bash`, `dd` and
+  `timeout` on the machine, which every boxd machine has.
+- The file tools, **Fork Machine** and **Get Preview URL** read the machine's
+  status first and start, resume or wake it when needed. The command tools
+  send the command and bring the machine back only when boxd answers that it
+  is not running.
+- **Download File** and **Read File** ask for the file's size before they
+  transfer it.
 - **Run Code** uploads the snippet to `/tmp`, runs it with `python3`, `node`,
   `bun run` or `bash`, and removes it.
 - **Start Service** starts the command in its own session with `nohup` and

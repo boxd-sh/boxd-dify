@@ -41,3 +41,17 @@ host, but it can reach the internet.
 - A preview URL is public. Don't serve anything on it that needs a login it
   does not have.
 - Give the tools only to models and users you trust with a Linux machine.
+
+## What the plugin limits
+
+Code on a machine is not trusted, so the plugin bounds what a machine can send
+back into Dify's plugin process:
+
+- Command output is cut inside the machine at 400,000 bytes per stream, and at
+  100,000 characters in the result.
+- Download File and Read File check a file's size before they transfer it and
+  refuse anything over 50 MiB.
+- A command is never run a second time unless the machine was stopped, paused
+  or hibernated when it was sent, so it had not started.
+- A machine the plugin creates or forks that does not become ready is deleted
+  again. A machine made for a one-off run also has a one-hour delete timer.

@@ -7,15 +7,15 @@ from dify_plugin.entities.tool import ToolInvokeMessage
 
 from _client import (
     CREATED_BY_LABEL,
-    READY_TIMEOUT,
     build_client,
     delete_after_param,
+    ensure_running,
     friendly_error,
-    get_machine,
     machine_summary,
     new_name,
     optional_int,
     require,
+    wait_ready_or_delete,
 )
 
 
@@ -28,12 +28,15 @@ class ForkMachineTool(Tool):
         delete_after = optional_int(tool_parameters, "delete_after")
         if delete_after is not None:
             kwargs["delete_after"] = delete_after_param(delete_after)
-        source = get_machine(client, source_id)
+        source = ensure_running(client, source_id)
         labels = dict(source.labels or {})
         labels[CREATED_BY_LABEL[0]] = CREATED_BY_LABEL[1]
         try:
             fork = client.machines.fork(source_id, name, isolated=True, labels=labels, **kwargs)
-            client.machines.wait_until_ready(fork.id, timeout=READY_TIMEOUT)
+        except BoxdError as e:
+            raise friendly_error(e) from e
+        wait_ready_or_delete(client, fork)
+        try:
             fork = client.machines.get(fork.id)
         except BoxdError as e:
             raise friendly_error(e) from e

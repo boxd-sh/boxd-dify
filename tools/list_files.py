@@ -5,7 +5,7 @@ from boxd.errors import BoxdError
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import HOME, abs_path, build_client, friendly_error, get_machine, require
+from _client import HOME, abs_path, build_client, ensure_running, friendly_error, require
 
 
 class ListFilesTool(Tool):
@@ -13,7 +13,7 @@ class ListFilesTool(Tool):
         client, _ = build_client(self.runtime.credentials)
         machine_id = require(tool_parameters, "machine_id")
         path = abs_path(str(tool_parameters.get("path") or "").strip() or HOME)
-        get_machine(client, machine_id)
+        ensure_running(client, machine_id)
         try:
             listing = client.machines.files.list_dir(machine_id, path)
         except BoxdError as e:

@@ -5,7 +5,7 @@ from boxd.errors import BoxdError, ConflictError
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import build_client, friendly_error, get_machine, require, to_int
+from _client import build_client, ensure_running, friendly_error, require, to_int
 
 
 class GetPreviewUrlTool(Tool):
@@ -15,7 +15,7 @@ class GetPreviewUrlTool(Tool):
         port = to_int(tool_parameters.get("port"), "port")
         if port < 1 or port > 65535:
             raise ValueError("port must be between 1 and 65535")
-        machine = get_machine(client, machine_id)
+        machine = ensure_running(client, machine_id)
         route = f"p{port}"
         try:
             proxy = self._find(client, machine_id, route)

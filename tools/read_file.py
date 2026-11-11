@@ -5,7 +5,7 @@ from boxd.errors import BoxdError
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from _client import MAX_OUTPUT_CHARS, abs_path, build_client, friendly_error, get_machine, require
+from _client import MAX_OUTPUT_CHARS, abs_path, build_client, ensure_running, file_size, friendly_error, require
 
 
 class ReadFileTool(Tool):
@@ -13,8 +13,9 @@ class ReadFileTool(Tool):
         client, _ = build_client(self.runtime.credentials)
         machine_id = require(tool_parameters, "machine_id")
         remote = abs_path(require(tool_parameters, "remote_path"), "remote_path")
-        get_machine(client, machine_id)
+        ensure_running(client, machine_id)
         try:
+            file_size(client, machine_id, remote)
             data = client.machines.files.download(machine_id, remote)
         except BoxdError as e:
             raise friendly_error(e) from e
