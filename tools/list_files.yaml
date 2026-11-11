@@ -1,0 +1,38 @@
+identity:
+  name: list_files
+  author: boxd
+  label:
+    en_US: List Files
+    zh_Hans: 列出文件
+description:
+  human:
+    en_US: List a directory on a machine.
+    zh_Hans: 列出机器上的目录。
+  llm: List the entries of a directory on a machine.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: path
+  type: string
+  required: false
+  label:
+    en_US: Path
+    zh_Hans: 路径
+  human_description:
+    en_US: Directory to list. Default /home/boxd.
+    zh_Hans: 要列出的目录。默认 /home/boxd。
+  llm_description: Directory to list. Default /home/boxd.
+  form: llm
+  default: ''
+extra:
+  python:
+    source: tools/list_files.py

@@ -1,0 +1,26 @@
+identity:
+  name: delete_machine
+  author: boxd
+  label:
+    en_US: Delete Machine
+    zh_Hans: 删除机器
+description:
+  human:
+    en_US: Delete a machine created by this plugin, with its disk.
+    zh_Hans: 删除由本插件创建的机器及其磁盘。
+  llm: Permanently delete a machine and its disk. Only machines created by this plugin can be deleted.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+extra:
+  python:
+    source: tools/delete_machine.py

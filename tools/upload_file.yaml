@@ -1,0 +1,49 @@
+identity:
+  name: upload_file
+  author: boxd
+  label:
+    en_US: Upload File
+    zh_Hans: 上传文件
+description:
+  human:
+    en_US: Upload a file from Dify to a machine.
+    zh_Hans: 将文件从 Dify 上传到机器。
+  llm: Upload a file from Dify into a machine.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: file
+  type: file
+  required: true
+  label:
+    en_US: File
+    zh_Hans: 文件
+  human_description:
+    en_US: The file to upload.
+    zh_Hans: 要上传的文件。
+  llm_description: The file to upload.
+  form: llm
+- name: remote_path
+  type: string
+  required: false
+  label:
+    en_US: Remote Path
+    zh_Hans: 远程路径
+  human_description:
+    en_US: Where to put it. A path ending in / is a directory. Default /home/boxd/<file name>.
+    zh_Hans: 存放位置。以 / 结尾表示目录。默认 /home/boxd/<文件名>。
+  llm_description: Where to put it. A path ending in / is a directory. Default /home/boxd/<file name>.
+  form: llm
+  default: ''
+extra:
+  python:
+    source: tools/upload_file.py

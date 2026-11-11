@@ -1,0 +1,37 @@
+identity:
+  name: download_file
+  author: boxd
+  label:
+    en_US: Download File
+    zh_Hans: 下载文件
+description:
+  human:
+    en_US: Download a file from a machine into Dify.
+    zh_Hans: 将文件从机器下载到 Dify。
+  llm: Download a file from a machine and return it as a Dify file, for example a generated chart or report.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: remote_path
+  type: string
+  required: true
+  label:
+    en_US: Remote Path
+    zh_Hans: 远程路径
+  human_description:
+    en_US: Path of the file on the machine.
+    zh_Hans: 机器上的文件路径。
+  llm_description: Path of the file on the machine.
+  form: llm
+extra:
+  python:
+    source: tools/download_file.py

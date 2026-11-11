@@ -1,0 +1,394 @@
+# Parallel forks: set a machine up once, fork it twice, try two things at once.
+#
+# Start -> boxd Create Machine -> boxd Run Command (setup) -> boxd Fork Machine x2
+#   -> boxd Run Code on fork A (Python) | boxd Run Code on fork B (JavaScript), in parallel
+#   -> boxd Delete Machine x3 -> End (result_a, result_b)
+#
+# The setup step writes numbers.txt. A fork is a copy of the whole machine, so
+# both forks have the file without running the setup again. Each result starts
+# with the name of the machine it ran on.
+#
+# All three machines get a one-hour delete_after: if a run stops halfway, boxd
+# deletes them anyway.
+app:
+  name: boxd parallel forks
+  description: Set a machine up once, fork it twice and run two approaches in parallel.
+  mode: workflow
+  icon: 📦
+  icon_background: '#E4E4E7'
+  icon_type: emoji
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+    - id: start
+      type: custom
+      data:
+        type: start
+        title: Start
+        desc: ''
+        variables: []
+      position:
+        x: 80
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: create
+      type: custom
+      data:
+        type: tool
+        title: Create Machine
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: create_machine
+        tool_label: Create Machine
+        tool_configurations:
+          delete_after: 3600
+        tool_parameters: {}
+      position:
+        x: 400
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: setup
+      type: custom
+      data:
+        type: tool
+        title: Set up
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: run_command
+        tool_label: Run Command
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#create.machine_id#}}'
+          command:
+            type: constant
+            value: seq 1 200000 > numbers.txt && wc -l < numbers.txt
+      position:
+        x: 720
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: fork_a
+      type: custom
+      data:
+        type: tool
+        title: Fork A
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: fork_machine
+        tool_label: Fork Machine
+        tool_configurations:
+          delete_after: 3600
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#create.machine_id#}}'
+      position:
+        x: 1040
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: fork_b
+      type: custom
+      data:
+        type: tool
+        title: Fork B
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: fork_machine
+        tool_label: Fork Machine
+        tool_configurations:
+          delete_after: 3600
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#create.machine_id#}}'
+      position:
+        x: 1360
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: run_a
+      type: custom
+      data:
+        type: tool
+        title: Python on fork A
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: run_code
+        tool_label: Run Code
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#fork_a.machine_id#}}'
+          code:
+            type: constant
+            value: |
+              import platform
+              total = sum(int(line) for line in open('/home/boxd/numbers.txt'))
+              print(platform.node(), 'python', total)
+          language:
+            type: constant
+            value: python
+      position:
+        x: 1680
+        y: 180
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: run_b
+      type: custom
+      data:
+        type: tool
+        title: JavaScript on fork B
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: run_code
+        tool_label: Run Code
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#fork_b.machine_id#}}'
+          code:
+            type: constant
+            value: |
+              import { readFileSync } from 'node:fs';
+              import { hostname } from 'node:os';
+              const lines = readFileSync('/home/boxd/numbers.txt', 'utf8').trim().split('\n');
+              console.log(hostname(), 'node', lines.reduce((sum, line) => sum + Number(line), 0));
+          language:
+            type: constant
+            value: javascript
+      position:
+        x: 1680
+        y: 380
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: delete_a
+      type: custom
+      data:
+        type: tool
+        title: Delete fork A
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: delete_machine
+        tool_label: Delete Machine
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#fork_a.machine_id#}}'
+      position:
+        x: 2000
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: delete_b
+      type: custom
+      data:
+        type: tool
+        title: Delete fork B
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: delete_machine
+        tool_label: Delete Machine
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#fork_b.machine_id#}}'
+      position:
+        x: 2320
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: delete
+      type: custom
+      data:
+        type: tool
+        title: Delete machine
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: delete_machine
+        tool_label: Delete Machine
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#create.machine_id#}}'
+      position:
+        x: 2640
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: end
+      type: custom
+      data:
+        type: end
+        title: End
+        desc: ''
+        outputs:
+        - variable: result_a
+          value_selector:
+          - run_a
+          - stdout
+        - variable: result_b
+          value_selector:
+          - run_b
+          - stdout
+      position:
+        x: 2960
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    edges:
+    - id: start-source-create
+      type: custom
+      source: start
+      sourceHandle: source
+      target: create
+      targetHandle: target
+      data:
+        sourceType: start
+        targetType: tool
+    - id: create-source-setup
+      type: custom
+      source: create
+      sourceHandle: source
+      target: setup
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: setup-source-fork_a
+      type: custom
+      source: setup
+      sourceHandle: source
+      target: fork_a
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: fork_a-source-fork_b
+      type: custom
+      source: fork_a
+      sourceHandle: source
+      target: fork_b
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: fork_b-source-run_a
+      type: custom
+      source: fork_b
+      sourceHandle: source
+      target: run_a
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: fork_b-source-run_b
+      type: custom
+      source: fork_b
+      sourceHandle: source
+      target: run_b
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: run_a-source-delete_a
+      type: custom
+      source: run_a
+      sourceHandle: source
+      target: delete_a
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: run_b-source-delete_a
+      type: custom
+      source: run_b
+      sourceHandle: source
+      target: delete_a
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: delete_a-source-delete_b
+      type: custom
+      source: delete_a
+      sourceHandle: source
+      target: delete_b
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: delete_b-source-delete
+      type: custom
+      source: delete_b
+      sourceHandle: source
+      target: delete
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: delete-source-end
+      type: custom
+      source: delete
+      sourceHandle: source
+      target: end
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: end

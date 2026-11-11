@@ -1,0 +1,27 @@
+# Development files that do not belong in the .difypkg
+tests/
+scripts/
+examples/
+assets/
+CHANGELOG.md
+SECURITY.md
+PUBLISHING.md
+pyproject.toml
+.venv/
+.env
+.env.*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+*.difypkg
+uv.lock
+.git/
+.gitignore
+.github/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

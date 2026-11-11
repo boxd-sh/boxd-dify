@@ -1,0 +1,107 @@
+identity:
+  name: create_machine
+  author: boxd
+  label:
+    en_US: Create Machine
+    zh_Hans: 创建机器
+description:
+  human:
+    en_US: 'Create an isolated boxd machine: a full Ubuntu VM with Python, Node, Docker and a persistent disk.'
+    zh_Hans: 创建一台隔离的 boxd 机器：完整的 Ubuntu 虚拟机，带 Python、Node、Docker 和持久磁盘。
+  llm: Create a new isolated boxd machine (a full Ubuntu 24.04 VM with Python 3, Node.js, Bun, Docker, git and a persistent 100 GB disk) and return its machine_id. Pass the machine_id to the other tools to reuse it across steps. Machines keep their files until deleted.
+parameters:
+- name: name
+  type: string
+  required: false
+  label:
+    en_US: Name
+    zh_Hans: 名称
+  human_description:
+    en_US: Machine name. Leave empty for a generated name.
+    zh_Hans: 机器名称。留空则自动生成。
+  llm_description: 'Optional machine name: lowercase letters, digits and hyphens. Leave empty to generate one.'
+  form: llm
+  default: ''
+- name: size
+  type: select
+  required: false
+  label:
+    en_US: Size
+    zh_Hans: 规格
+  human_description:
+    en_US: vCPU and memory. Leave empty for your org's default.
+    zh_Hans: vCPU 和内存。留空使用组织默认值。
+  llm_description: vCPU and memory. Leave empty for your org's default.
+  form: form
+  options:
+  - value: 1x4
+    label:
+      en_US: 1 vCPU, 4 GiB
+      zh_Hans: 1 vCPU, 4 GiB
+  - value: 2x8
+    label:
+      en_US: 2 vCPU, 8 GiB
+      zh_Hans: 2 vCPU, 8 GiB
+  - value: 4x16
+    label:
+      en_US: 4 vCPU, 16 GiB
+      zh_Hans: 4 vCPU, 16 GiB
+  - value: 8x32
+    label:
+      en_US: 8 vCPU, 32 GiB
+      zh_Hans: 8 vCPU, 32 GiB
+- name: auto_suspend_timeout
+  type: number
+  required: false
+  label:
+    en_US: Auto-suspend (seconds)
+    zh_Hans: 自动挂起（秒）
+  human_description:
+    en_US: Put the machine on standby after this many idle seconds. 0 turns it off. Empty keeps the default.
+    zh_Hans: 空闲多少秒后让机器待机。0 表示关闭。留空使用默认值。
+  llm_description: Put the machine on standby after this many idle seconds. 0 turns it off. Empty keeps the default.
+  form: form
+- name: from_snapshot
+  type: string
+  required: false
+  label:
+    en_US: From Snapshot
+    zh_Hans: 来自快照
+  human_description:
+    en_US: Create the machine from a saved boxd snapshot.
+    zh_Hans: 从已保存的 boxd 快照创建机器。
+  llm_description: Create the machine from a saved boxd snapshot.
+  form: form
+  default: ''
+- name: labels
+  type: string
+  required: false
+  label:
+    en_US: Labels (JSON)
+    zh_Hans: 标签（JSON）
+  human_description:
+    en_US: 'Labels as a JSON object, for example {"project": "demo"}.'
+    zh_Hans: '以 JSON 对象表示的标签，例如 {"project": "demo"}。'
+  llm_description: 'Labels as a JSON object, for example {"project": "demo"}.'
+  form: form
+  default: ''
+- name: delete_after
+  type: number
+  required: false
+  label:
+    en_US: Delete after (seconds)
+    zh_Hans: 定时删除（秒）
+  human_description:
+    en_US: boxd deletes the machine this many seconds from now, whatever it is doing. At least 60. Empty means never.
+    zh_Hans: boxd 会在这么多秒之后删除机器，无论它在做什么。最少 60。留空表示不自动删除。
+  llm_description: Optional safety net. boxd deletes the machine this many seconds from now, whatever it is doing. At least 60. Leave empty to keep the machine until it is deleted by hand.
+  form: form
+output_schema:
+  type: object
+  properties:
+    machine_id:
+      type: string
+      description: The id of the new machine.
+extra:
+  python:
+    source: tools/create_machine.py

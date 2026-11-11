@@ -1,0 +1,48 @@
+identity:
+  name: get_service_logs
+  author: boxd
+  label:
+    en_US: Get Service Logs
+    zh_Hans: 获取服务日志
+description:
+  human:
+    en_US: Read the output of a service started with Start Service.
+    zh_Hans: 读取通过启动服务启动的服务的输出。
+  llm: Read the latest output of a background service and whether it is still running.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: service_id
+  type: string
+  required: true
+  label:
+    en_US: Service ID
+    zh_Hans: 服务 ID
+  human_description:
+    en_US: The service_id from Start Service.
+    zh_Hans: 启动服务返回的 service_id。
+  llm_description: The service_id from Start Service.
+  form: llm
+- name: lines
+  type: number
+  required: false
+  label:
+    en_US: Lines
+    zh_Hans: 行数
+  human_description:
+    en_US: How many of the last lines to return. Default 200.
+    zh_Hans: 返回最后多少行。默认 200。
+  llm_description: How many of the last lines to return. Default 200.
+  form: llm
+extra:
+  python:
+    source: tools/get_service_logs.py

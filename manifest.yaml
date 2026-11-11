@@ -1,0 +1,38 @@
+version: 0.1.0
+type: plugin
+author: boxd
+name: boxd
+label:
+  en_US: boxd
+  zh_Hans: boxd
+description:
+  en_US: Run commands, code and services on isolated boxd machines. Each machine is a full Linux VM with a persistent disk that you can fork, hibernate and wake.
+  zh_Hans: 在隔离的 boxd 机器上运行命令、代码和服务。每台机器都是带持久磁盘的完整 Linux 虚拟机，可以复刻、休眠和唤醒。
+icon: icon.png
+tags:
+  - utilities
+  - agent
+resource:
+  memory: 268435456
+  permission: {}
+plugins:
+  tools:
+    - provider/boxd.yaml
+meta:
+  version: 0.0.1
+  arch:
+    - amd64
+    - arm64
+  runner:
+    language: python
+    version: "3.12"
+    entrypoint: main
+  minimum_dify_version: 1.10.0
+created_at: 2026-11-11T00:00:00Z
+privacy: PRIVACY.md
+repo: https://github.com/boxd-sh/boxd-dify
+contact: contact@boxd.sh
+network:
+  domains:
+    - boxd.sh
+verified: false

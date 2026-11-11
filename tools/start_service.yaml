@@ -1,0 +1,67 @@
+identity:
+  name: start_service
+  author: boxd
+  label:
+    en_US: Start Service
+    zh_Hans: 启动服务
+description:
+  human:
+    en_US: Start a long-running process, such as a web server, in the background.
+    zh_Hans: 在后台启动长期运行的进程，例如 Web 服务器。
+  llm: Start a long-running background process (web server, worker) on a machine. It keeps running after this call returns. Returns a service_id for Get Service Logs. Bind servers to 0.0.0.0 and use Get Preview URL to reach them.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: command
+  type: string
+  required: true
+  label:
+    en_US: Command
+    zh_Hans: 命令
+  human_description:
+    en_US: The command that runs the service.
+    zh_Hans: 运行服务的命令。
+  llm_description: The bash command that runs the service in the foreground, for example 'python3 -m http.server 8000'.
+  form: llm
+- name: cwd
+  type: string
+  required: false
+  label:
+    en_US: Working Directory
+    zh_Hans: 工作目录
+  human_description:
+    en_US: Directory to start in. Default /home/boxd.
+    zh_Hans: 启动目录。默认 /home/boxd。
+  llm_description: Directory to start in. Default /home/boxd.
+  form: llm
+  default: ''
+- name: env_vars
+  type: string
+  required: false
+  label:
+    en_US: Environment Variables (JSON)
+    zh_Hans: 环境变量（JSON）
+  human_description:
+    en_US: 'Environment variables as a JSON object, for example {"NODE_ENV": "production"}.'
+    zh_Hans: '以 JSON 对象表示的环境变量，例如 {"NODE_ENV": "production"}。'
+  llm_description: 'Environment variables as a JSON object string, for example {"NODE_ENV": "production"}.'
+  form: llm
+  default: ''
+output_schema:
+  type: object
+  properties:
+    service_id:
+      type: string
+      description: The id to pass to Get Service Logs.
+extra:
+  python:
+    source: tools/start_service.py

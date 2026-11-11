@@ -1,0 +1,27 @@
+identity:
+  name: list_machines
+  author: boxd
+  label:
+    en_US: List Machines
+    zh_Hans: 列出机器
+description:
+  human:
+    en_US: List boxd machines with their IDs and status.
+    zh_Hans: 列出 boxd 机器及其 ID 和状态。
+  llm: List boxd machines with machine_id, name and status. By default only machines created by this plugin.
+parameters:
+- name: include_all
+  type: boolean
+  required: false
+  label:
+    en_US: Include All
+    zh_Hans: 包含全部
+  human_description:
+    en_US: Also list machines not created by this plugin.
+    zh_Hans: 同时列出不是由本插件创建的机器。
+  llm_description: Also list machines not created by this plugin.
+  form: form
+  default: false
+extra:
+  python:
+    source: tools/list_machines.py

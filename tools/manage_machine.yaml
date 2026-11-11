@@ -1,0 +1,62 @@
+identity:
+  name: manage_machine
+  author: boxd
+  label:
+    en_US: Manage Machine
+    zh_Hans: 管理机器
+description:
+  human:
+    en_US: Start, stop, pause, resume, hibernate or wake a machine.
+    zh_Hans: 启动、停止、暂停、恢复、休眠或唤醒机器。
+  llm: 'Change a machine''s state: start or stop it, pause or resume it (standby keeps memory), or hibernate or wake it (memory is saved to disk; processes continue after wake).'
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: action
+  type: select
+  required: true
+  label:
+    en_US: Action
+    zh_Hans: 操作
+  human_description:
+    en_US: What to do with the machine.
+    zh_Hans: 要执行的操作。
+  llm_description: One of start, stop, pause, resume, hibernate, wake.
+  form: llm
+  options:
+  - value: start
+    label:
+      en_US: Start
+      zh_Hans: 启动
+  - value: stop
+    label:
+      en_US: Stop
+      zh_Hans: 停止
+  - value: pause
+    label:
+      en_US: Pause
+      zh_Hans: 暂停
+  - value: resume
+    label:
+      en_US: Resume
+      zh_Hans: 恢复
+  - value: hibernate
+    label:
+      en_US: Hibernate
+      zh_Hans: 休眠
+  - value: wake
+    label:
+      en_US: Wake
+      zh_Hans: 唤醒
+extra:
+  python:
+    source: tools/manage_machine.py

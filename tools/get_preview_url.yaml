@@ -1,0 +1,43 @@
+identity:
+  name: get_preview_url
+  author: boxd
+  label:
+    en_US: Get Preview URL
+    zh_Hans: 获取预览链接
+description:
+  human:
+    en_US: Get a public HTTPS URL for a port on a machine.
+    zh_Hans: 获取机器上某个端口的公共 HTTPS 链接。
+  llm: Get a public HTTPS URL that forwards to a port inside a machine, so a person can open a web app or API running there. Anyone with the URL can reach it. A new URL can take up to a minute to start answering.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: port
+  type: number
+  required: true
+  label:
+    en_US: Port
+    zh_Hans: 端口
+  human_description:
+    en_US: The port the service listens on inside the machine.
+    zh_Hans: 服务在机器内监听的端口。
+  llm_description: The port the service listens on inside the machine.
+  form: llm
+output_schema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: The public HTTPS URL.
+extra:
+  python:
+    source: tools/get_preview_url.py

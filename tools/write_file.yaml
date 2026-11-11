@@ -1,0 +1,48 @@
+identity:
+  name: write_file
+  author: boxd
+  label:
+    en_US: Write File
+    zh_Hans: 写入文件
+description:
+  human:
+    en_US: Write text to a file on a machine.
+    zh_Hans: 将文本写入机器上的文件。
+  llm: Write text content to a file on a machine, replacing it if it exists. Parent directories are created.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: remote_path
+  type: string
+  required: true
+  label:
+    en_US: Remote Path
+    zh_Hans: 远程路径
+  human_description:
+    en_US: Path of the file on the machine.
+    zh_Hans: 机器上的文件路径。
+  llm_description: Path of the file on the machine.
+  form: llm
+- name: content
+  type: string
+  required: true
+  label:
+    en_US: Content
+    zh_Hans: 内容
+  human_description:
+    en_US: The text to write.
+    zh_Hans: 要写入的文本。
+  llm_description: The text to write.
+  form: llm
+extra:
+  python:
+    source: tools/write_file.py

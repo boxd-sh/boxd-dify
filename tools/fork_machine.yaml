@@ -1,0 +1,55 @@
+identity:
+  name: fork_machine
+  author: boxd
+  label:
+    en_US: Fork Machine
+    zh_Hans: 复刻机器
+description:
+  human:
+    en_US: 'Make a live copy of a machine: disk, memory and running processes.'
+    zh_Hans: 实时复制一台机器：磁盘、内存和正在运行的进程。
+  llm: Fork a machine into a new machine with the same disk, memory and running processes. Use it to try something risky on a copy, or to branch an agent's work. Returns the new machine_id.
+parameters:
+- name: machine_id
+  type: string
+  required: true
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: The ID of a boxd machine.
+    zh_Hans: boxd 机器的 ID。
+  llm_description: The machine_id returned by Create Machine.
+  form: llm
+- name: name
+  type: string
+  required: false
+  label:
+    en_US: Name
+    zh_Hans: 名称
+  human_description:
+    en_US: Name for the copy. Leave empty for a generated name.
+    zh_Hans: 副本名称。留空则自动生成。
+  llm_description: Name for the copy. Leave empty for a generated name.
+  form: llm
+  default: ''
+- name: delete_after
+  type: number
+  required: false
+  label:
+    en_US: Delete after (seconds)
+    zh_Hans: 定时删除（秒）
+  human_description:
+    en_US: boxd deletes the machine this many seconds from now, whatever it is doing. At least 60. Empty means never.
+    zh_Hans: boxd 会在这么多秒之后删除机器，无论它在做什么。最少 60。留空表示不自动删除。
+  llm_description: Optional safety net. boxd deletes the machine this many seconds from now, whatever it is doing. At least 60. Leave empty to keep the machine until it is deleted by hand.
+  form: form
+output_schema:
+  type: object
+  properties:
+    machine_id:
+      type: string
+      description: The id of the copy.
+extra:
+  python:
+    source: tools/fork_machine.py

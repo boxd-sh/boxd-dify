@@ -1,0 +1,41 @@
+[project]
+name = "boxd-dify"
+version = "0.1.0"
+description = "Dify tool plugin for boxd machines"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "boxd", email = "contact@boxd.sh" }]
+requires-python = ">=3.12"
+dependencies = [
+    "dify-plugin==0.11.0",
+    "boxd==0.3.1",
+]
+
+[project.urls]
+Homepage = "https://boxd.sh"
+Documentation = "https://docs.boxd.sh"
+Repository = "https://github.com/boxd-sh/boxd-dify"
+Issues = "https://github.com/boxd-sh/boxd-dify/issues"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.6,<1", "ty>=0.0.1,<1", "pyyaml>=6,<7"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "RUF100"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["_client", "provider", "tools", "conftest"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["_client.py", "main.py", "provider", "tools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

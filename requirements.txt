@@ -1,0 +1,2 @@
+dify-plugin==0.11.0
+boxd==0.3.1

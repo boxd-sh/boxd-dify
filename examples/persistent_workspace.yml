@@ -1,0 +1,249 @@
+# Persistent workspace: one machine that the workflow comes back to.
+#
+# Start (machine_id, optional) -> IF machine_id is empty -> boxd Create Machine
+#   -> boxd Run Command -> boxd Manage Machine (hibernate) -> End (machine_id, runs)
+#
+# The first run has no machine_id, so it creates a machine. Every run appends a
+# line to runs.log in the machine's home directory, prints the number of lines,
+# and hibernates the machine. Pass the machine_id from the first run to the
+# next one: Run Command wakes the machine and the file is still there.
+#
+# A hibernated machine uses no CPU or memory. Delete it with the Delete Machine
+# tool when you no longer need it.
+app:
+  name: boxd persistent workspace
+  description: A machine that keeps its files and hibernates between runs.
+  mode: workflow
+  icon: 📦
+  icon_background: '#E4E4E7'
+  icon_type: emoji
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+    - id: start
+      type: custom
+      data:
+        type: start
+        title: Start
+        desc: ''
+        variables:
+        - variable: machine_id
+          label: Machine ID (empty on the first run)
+          type: text-input
+          required: false
+          max_length: 64
+      position:
+        x: 80
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: first_run
+      type: custom
+      data:
+        type: if-else
+        title: First run?
+        desc: ''
+        cases:
+        - case_id: 'true'
+          logical_operator: and
+          conditions:
+          - id: machine-id-empty
+            variable_selector:
+            - start
+            - machine_id
+            comparison_operator: empty
+            value: ''
+            varType: string
+      position:
+        x: 400
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: create
+      type: custom
+      data:
+        type: tool
+        title: Create Machine
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: create_machine
+        tool_label: Create Machine
+        tool_configurations: {}
+        tool_parameters: {}
+      position:
+        x: 720
+        y: 140
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: machine
+      type: custom
+      data:
+        type: variable-aggregator
+        title: Machine
+        desc: ''
+        output_type: string
+        variables:
+        - - create
+          - machine_id
+        - - start
+          - machine_id
+      position:
+        x: 1040
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: work
+      type: custom
+      data:
+        type: tool
+        title: Run Command
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: run_command
+        tool_label: Run Command
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#machine.output#}}'
+          command:
+            type: constant
+            value: date -u +%FT%TZ >> runs.log && wc -l < runs.log
+      position:
+        x: 1360
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: sleep
+      type: custom
+      data:
+        type: tool
+        title: Hibernate
+        desc: ''
+        provider_id: boxd/boxd/boxd
+        provider_name: boxd/boxd/boxd
+        provider_type: builtin
+        tool_name: manage_machine
+        tool_label: Manage Machine
+        tool_configurations: {}
+        tool_parameters:
+          machine_id:
+            type: mixed
+            value: '{{#machine.output#}}'
+          action:
+            type: constant
+            value: hibernate
+      position:
+        x: 1680
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    - id: end
+      type: custom
+      data:
+        type: end
+        title: End
+        desc: ''
+        outputs:
+        - variable: machine_id
+          value_selector:
+          - machine
+          - output
+        - variable: runs
+          value_selector:
+          - work
+          - stdout
+      position:
+        x: 2000
+        y: 280
+      width: 244
+      height: 90
+      sourcePosition: right
+      targetPosition: left
+    edges:
+    - id: start-source-first_run
+      type: custom
+      source: start
+      sourceHandle: source
+      target: first_run
+      targetHandle: target
+      data:
+        sourceType: start
+        targetType: if-else
+    - id: first_run-true-create
+      type: custom
+      source: first_run
+      sourceHandle: 'true'
+      target: create
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: tool
+    - id: first_run-false-machine
+      type: custom
+      source: first_run
+      sourceHandle: 'false'
+      target: machine
+      targetHandle: target
+      data:
+        sourceType: if-else
+        targetType: variable-aggregator
+    - id: create-source-machine
+      type: custom
+      source: create
+      sourceHandle: source
+      target: machine
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: variable-aggregator
+    - id: machine-source-work
+      type: custom
+      source: machine
+      sourceHandle: source
+      target: work
+      targetHandle: target
+      data:
+        sourceType: variable-aggregator
+        targetType: tool
+    - id: work-source-sleep
+      type: custom
+      source: work
+      sourceHandle: source
+      target: sleep
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: tool
+    - id: sleep-source-end
+      type: custom
+      source: sleep
+      sourceHandle: source
+      target: end
+      targetHandle: target
+      data:
+        sourceType: tool
+        targetType: end

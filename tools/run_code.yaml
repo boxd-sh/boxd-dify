@@ -1,0 +1,102 @@
+identity:
+  name: run_code
+  author: boxd
+  label:
+    en_US: Run Code
+    zh_Hans: 运行代码
+description:
+  human:
+    en_US: Run a Python, JavaScript, TypeScript or Bash snippet on a boxd machine.
+    zh_Hans: 在 boxd 机器上运行 Python、JavaScript、TypeScript 或 Bash 代码片段。
+  llm: Run a code snippet on a boxd machine and return stdout, stderr and exit_code. Print what you want to see. Python 3.12, Node.js and Bun are installed. Without machine_id a new isolated machine is used once and deleted.
+parameters:
+- name: code
+  type: string
+  required: true
+  label:
+    en_US: Code
+    zh_Hans: 代码
+  human_description:
+    en_US: The code to run.
+    zh_Hans: 要运行的代码。
+  llm_description: The complete program to run. Print the results.
+  form: llm
+- name: language
+  type: select
+  required: false
+  label:
+    en_US: Language
+    zh_Hans: 语言
+  human_description:
+    en_US: Language of the code. Default Python.
+    zh_Hans: 代码语言。默认 Python。
+  llm_description: One of python, javascript, typescript, bash. Default python.
+  form: llm
+  default: python
+  options:
+  - value: python
+    label:
+      en_US: Python
+      zh_Hans: Python
+  - value: javascript
+    label:
+      en_US: JavaScript
+      zh_Hans: JavaScript
+  - value: typescript
+    label:
+      en_US: TypeScript
+      zh_Hans: TypeScript
+  - value: bash
+    label:
+      en_US: Bash
+      zh_Hans: Bash
+- name: env_vars
+  type: string
+  required: false
+  label:
+    en_US: Environment Variables (JSON)
+    zh_Hans: 环境变量（JSON）
+  human_description:
+    en_US: 'Environment variables as a JSON object, for example {"NODE_ENV": "production"}.'
+    zh_Hans: '以 JSON 对象表示的环境变量，例如 {"NODE_ENV": "production"}。'
+  llm_description: 'Environment variables as a JSON object string, for example {"NODE_ENV": "production"}.'
+  form: llm
+  default: ''
+- name: timeout
+  type: number
+  required: false
+  label:
+    en_US: Timeout (seconds)
+    zh_Hans: 超时（秒）
+  human_description:
+    en_US: Maximum run time in seconds, 1 to 600. Default 120. The command is stopped when it is reached.
+    zh_Hans: 最长运行时间（秒），1 到 600，默认 120。超时后命令会被终止。
+  llm_description: Maximum run time in seconds (1 to 600, default 120). Use a higher value for installs and test runs. For servers use Start Service instead.
+  form: llm
+- name: machine_id
+  type: string
+  required: false
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: An existing machine. Leave empty to run on a new machine that is deleted afterwards.
+    zh_Hans: 已有机器的 ID。留空则在新机器上运行，运行后删除。
+  llm_description: The machine_id of an existing boxd machine. If empty, a new isolated machine is created for this call and deleted afterwards; files do not persist.
+  form: llm
+  default: ''
+output_schema:
+  type: object
+  properties:
+    stdout:
+      type: string
+      description: What the code wrote to stdout.
+    stderr:
+      type: string
+      description: What the code wrote to stderr.
+    exit_code:
+      type: number
+      description: The exit code.
+extra:
+  python:
+    source: tools/run_code.py

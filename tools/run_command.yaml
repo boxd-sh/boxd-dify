@@ -1,0 +1,85 @@
+identity:
+  name: run_command
+  author: boxd
+  label:
+    en_US: Run Command
+    zh_Hans: 运行命令
+description:
+  human:
+    en_US: Run a shell command on a boxd machine and return stdout, stderr and the exit code.
+    zh_Hans: 在 boxd 机器上运行 shell 命令，返回标准输出、标准错误和退出码。
+  llm: Run a bash command on a boxd machine (Ubuntu 24.04, user boxd with sudo, home /home/boxd). Returns stdout, stderr and exit_code separately. Without machine_id a new isolated machine is used once and deleted.
+parameters:
+- name: command
+  type: string
+  required: true
+  label:
+    en_US: Command
+    zh_Hans: 命令
+  human_description:
+    en_US: The bash command to run.
+    zh_Hans: 要运行的 bash 命令。
+  llm_description: The bash command to run. Pipes, && and redirects work.
+  form: llm
+- name: cwd
+  type: string
+  required: false
+  label:
+    en_US: Working Directory
+    zh_Hans: 工作目录
+  human_description:
+    en_US: Directory to run in. Default /home/boxd.
+    zh_Hans: 运行目录。默认 /home/boxd。
+  llm_description: Absolute directory to run the command in. Default /home/boxd.
+  form: llm
+  default: ''
+- name: env_vars
+  type: string
+  required: false
+  label:
+    en_US: Environment Variables (JSON)
+    zh_Hans: 环境变量（JSON）
+  human_description:
+    en_US: 'Environment variables as a JSON object, for example {"NODE_ENV": "production"}.'
+    zh_Hans: '以 JSON 对象表示的环境变量，例如 {"NODE_ENV": "production"}。'
+  llm_description: 'Environment variables as a JSON object string, for example {"NODE_ENV": "production"}.'
+  form: llm
+  default: ''
+- name: timeout
+  type: number
+  required: false
+  label:
+    en_US: Timeout (seconds)
+    zh_Hans: 超时（秒）
+  human_description:
+    en_US: Maximum run time in seconds, 1 to 600. Default 120. The command is stopped when it is reached.
+    zh_Hans: 最长运行时间（秒），1 到 600，默认 120。超时后命令会被终止。
+  llm_description: Maximum run time in seconds (1 to 600, default 120). Use a higher value for installs and test runs. For servers use Start Service instead.
+  form: llm
+- name: machine_id
+  type: string
+  required: false
+  label:
+    en_US: Machine ID
+    zh_Hans: 机器 ID
+  human_description:
+    en_US: An existing machine. Leave empty to run on a new machine that is deleted afterwards.
+    zh_Hans: 已有机器的 ID。留空则在新机器上运行，运行后删除。
+  llm_description: The machine_id of an existing boxd machine. If empty, a new isolated machine is created for this call and deleted afterwards; files do not persist.
+  form: llm
+  default: ''
+output_schema:
+  type: object
+  properties:
+    stdout:
+      type: string
+      description: What the command wrote to stdout.
+    stderr:
+      type: string
+      description: What the command wrote to stderr.
+    exit_code:
+      type: number
+      description: The command's exit code.
+extra:
+  python:
+    source: tools/run_command.py

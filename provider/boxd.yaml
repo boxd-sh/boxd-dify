@@ -1,0 +1,87 @@
+identity:
+  author: boxd
+  name: boxd
+  label:
+    en_US: boxd
+    zh_Hans: boxd
+  description:
+    en_US: 'Run commands, code and services on isolated boxd machines: full Linux VMs with a persistent disk, fork and hibernate.'
+    zh_Hans: 在隔离的 boxd 机器上运行命令、代码和服务：带持久磁盘的完整 Linux 虚拟机，支持复刻和休眠。
+  icon: icon.png
+  tags:
+  - utilities
+credentials_for_provider:
+  api_key:
+    type: secret-input
+    required: true
+    label:
+      en_US: API Key
+      zh_Hans: API 密钥
+    placeholder:
+      en_US: bxd_...
+      zh_Hans: bxd_...
+    help:
+      en_US: 'Create an API key with: boxd auth keys create dify --org <your org>'
+      zh_Hans: 使用以下命令创建 API 密钥：boxd auth keys create dify --org <你的组织>
+    url: https://app.boxd.sh/keys?ref=boxd-dify
+  org:
+    type: text-input
+    required: false
+    label:
+      en_US: Organization
+      zh_Hans: 组织
+    placeholder:
+      en_US: Leave empty to use the key's organization
+      zh_Hans: 留空则使用密钥所属组织
+    help:
+      en_US: The boxd organization machines are created in.
+      zh_Hans: 创建机器所在的 boxd 组织。
+  region:
+    type: select
+    required: false
+    label:
+      en_US: Region
+      zh_Hans: 区域
+    options:
+    - value: nyc
+      label:
+        en_US: New York (nyc)
+        zh_Hans: 纽约 (nyc)
+    - value: fra
+      label:
+        en_US: Frankfurt (fra)
+        zh_Hans: 法兰克福 (fra)
+    help:
+      en_US: Where new machines run. Leave empty for your account's default.
+      zh_Hans: 新机器运行的区域。留空使用账户默认值。
+  name_prefix:
+    type: text-input
+    required: false
+    label:
+      en_US: Machine Name Prefix
+      zh_Hans: 机器名称前缀
+    placeholder:
+      en_US: dify-
+      zh_Hans: dify-
+    help:
+      en_US: Prefix for generated machine names. Default dify-.
+      zh_Hans: 自动生成的机器名称前缀。默认 dify-。
+tools:
+- tools/create_machine.yaml
+- tools/list_machines.yaml
+- tools/manage_machine.yaml
+- tools/fork_machine.yaml
+- tools/delete_machine.yaml
+- tools/run_command.yaml
+- tools/run_code.yaml
+- tools/start_service.yaml
+- tools/get_service_logs.yaml
+- tools/upload_file.yaml
+- tools/download_file.yaml
+- tools/read_file.yaml
+- tools/write_file.yaml
+- tools/list_files.yaml
+- tools/get_preview_url.yaml
+extra:
+  python:
+    source: provider/boxd.py
