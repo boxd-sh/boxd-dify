@@ -48,7 +48,7 @@ Dify checks the key by listing your machines once.
 
 ## Quick start
 
-1. Download [`examples/quickstart.yml`](examples/quickstart.yml).
+1. Download [`examples/quickstart.yml`](https://github.com/boxd-sh/boxd-dify/blob/main/examples/quickstart.yml).
 2. In Dify, open **Studio**, choose **Import DSL file** and pick the file.
 3. Run the workflow with the default input. It has three nodes: **Start**,
    the boxd **Run Code** tool and **End**. It runs your Python on a fresh
@@ -149,14 +149,14 @@ command is not repeated.
 Three workflows to import with **Studio > Import DSL file**. Each one runs
 against real boxd.
 
-- [`examples/quickstart.yml`](examples/quickstart.yml): runs Python on a fresh
+- [`examples/quickstart.yml`](https://github.com/boxd-sh/boxd-dify/blob/main/examples/quickstart.yml): runs Python on a fresh
   machine that is deleted afterwards.
-- [`examples/persistent_workspace.yml`](examples/persistent_workspace.yml): a
+- [`examples/persistent_workspace.yml`](https://github.com/boxd-sh/boxd-dify/blob/main/examples/persistent_workspace.yml): a
   machine the workflow comes back to. The first run creates it and returns its
   `machine_id`. Every run appends a line to a file, returns the line count and
   hibernates the machine. Pass the `machine_id` to the next run: the machine
   wakes with its files intact.
-- [`examples/parallel_forks.yml`](examples/parallel_forks.yml): sets a machine
+- [`examples/parallel_forks.yml`](https://github.com/boxd-sh/boxd-dify/blob/main/examples/parallel_forks.yml): sets a machine
   up once, forks it twice and runs Python on one fork and JavaScript on the
   other in parallel. Both forks have the files from the setup step. All three
   machines are deleted at the end.
@@ -289,7 +289,7 @@ dify-plugin plugin package . -o boxd-0.1.0.difypkg
 ## Links
 
 - [boxd documentation](https://docs.boxd.sh?ref=boxd-dify)
-- [Privacy policy](PRIVACY.md)
+- [Privacy policy](https://github.com/boxd-sh/boxd-dify/blob/main/PRIVACY.md)
 - [Changelog](https://github.com/boxd-sh/boxd-dify/blob/main/CHANGELOG.md)
 
 ## License
